@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { getManifest, getLicense, decryptMslResponse } from './mslClient';
 // import logo from './logo.svg';
 import './App.css';
 
@@ -15,35 +16,59 @@ const App = () => {
   const obtainSessionMediaKeys = async () => {
     video.current = document.querySelector('video');
     config.current = getKeySystemConfig();
-    mediaKeys.current = await initMediaKeySystem(config.current, video.current);
-    await createMediaKeySession(mediaKeys.current);
+    mediaKeys.current = await initMediaKeySystem();
+    await createMediaKeySession();
   };
-
+  
   // Netflix only
   const getKeySystemConfig = () => {
       return [{
         distinctiveIdentifier: 'not-allowed',
         videoCapabilities: [{
-          contentType: 'video/mp4;codecs=avc1.42E01E',
+          contentType: 'video/mp4;codecs=vp09.00.11.08.02',
           robustness: 'HW_SECURE_DECODE'
         }, {
-          contentType: 'video/mp4;codecs=avc1.42E01E',
+          contentType: 'video/mp4;codecs=vp09.00.11.08.02',
           robustness: 'SW_SECURE_DECODE'
         }],
         audioCapabilities: [{
-          contentType: 'audio/mp4;codecs=mp4a.40.2',
+          contentType: 'audio/mp4; codecs="mp4a.40.5"',
           robustness: 'SW_SECURE_CRYPTO'
         }]
       }];
+
+      // return [{
+      //   distinctiveIdentifier: 'not-allowed',
+      //   initDataTypes: ['cenc'],
+      //   label: '',
+      //   persistentState: 'required',
+      //   sessionTypes: ['temporary'],
+      //   videoCapabilities: [{
+      //     contentType: 'video/mp4; codecs="avc1.640028"',
+      //     robustness: 'SW_SECURE_DECODE',
+      //     encryptionScheme: null
+      //   }, {
+      //     contentType: 'video/mp4; codecs="avc1.640028"',
+      //     robustness: 'SW_SECURE_CRYPTO',
+      //     encryptionScheme: null
+      //   }],
+      //   audioCapabilities: [{
+      //     contentType: 'audio/mp4; codecs="mp4a.40.5"',
+      //     robustness: "SW_SECURE_CRYPTO",
+      //     encryptionScheme: null
+      //   }]
+      // }];
+
   }
 
-  const initMediaKeySystem = async (config, video) => {
+  
+  const initMediaKeySystem = async () => {
     try {
-      const keySystem = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', config);
+      const keySystem = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', config.current);
       const mediaKeys = await keySystem.createMediaKeys();
        // Netflix only
       mediaKeys.setServerCertificate(Uint8Array.from(atob(SERVER_CERT), c => c.charCodeAt(0))).then(ok => console.log('valid server certificate', ok));
-      video.setMediaKeys(mediaKeys);
+      video.current.setMediaKeys(mediaKeys);
       return mediaKeys;
     } catch (error) {
       console.log(error);
@@ -53,8 +78,8 @@ const App = () => {
   }
   
   // Netflix only version
-  const createMediaKeySession = async (mediaKeys) => {
-    keySession.current = mediaKeys.createSession(
+  const createMediaKeySession = async () => {
+    keySession.current = mediaKeys.current.createSession(
       'temporary',
       new Uint8Array(0),
       new Uint8Array(`<ServerCert>${SERVER_CERT}</ServerCert>`));
@@ -69,8 +94,9 @@ const App = () => {
   
   const handleMessage = async (event) => {
     console.log('here in handleMessage', event);
-    const response = await fetch(LICENSE_SERVER_URL, { method: 'POST', body: event.message });
-    const license = await response.arrayBuffer();
+    const license = await getLicense(event.message, event.target.sessionId);
+    // const response = await fetch(LICENSE_SERVER_URL, { method: 'POST', body: event.message });
+    // const license = await response.arrayBuffer();
     const keySession = event.target;
     keySession.update(license);
   }
@@ -86,14 +112,15 @@ const App = () => {
     xhr.send();
   }
 
-  const playSomethingFromNetflix = () => {
+  const playSomethingFromNetflix = async () => {
+    const manifest = await getManifest('https://www.netflix.com/watch/80244088');
     const mediaSource = new MediaSource();
     mediaSource.addEventListener('sourceopen', async () => {
       console.log('readyState', mediaSource.readyState);
       // console.log('readyState', this.readyState);
-      sourceBuffer.current = mediaSource.addSourceBuffer('video/mp4;codecs=avc1.42E01E')
+      sourceBuffer.current = mediaSource.addSourceBuffer('video/mp4;codecs=vp09.00.11.08.02')
       console.log('Source buffer created', sourceBuffer.current);
-      const url = 'https://ipv4-c368-sjc002-dev-ix.1.oca.nflxvideo.net/range/4207714-4469400?o=AQNwDtVmbrwBmALNRGIVD9NUsZnlpkUCzZxzoVumToxBIkB4ctMbafl5qsVx98zGRwpJeiGIeRwao8wAJZeFWIVNy5U31ifbUAcnAb_SWbWkPTC477ybqEtfVyWz3gXQnjLQW-l8CNe_549_H_kdQ6hEsi544irLU5Jed5v8ASCBjgzjmuG5xjmgnvVcE-r3NPw2iF2Xsf6ApTxDWbY8CMKFElQUr8q40PBPNReWQYZ7Ek9dqXVlpBLF2A&v=5&e=1593517142&t=SLpKcFDiZp2TAXeSfvaWk9zCLl4&sc=Eq%02%06%20IpG%04x%02%5Ef%06ztlY%00Lp%04o%08f%06r%5D%24IFW49%0FFb%2B%0A%10o%5EH%7D~%03%1DHVvQgG';
+      const url = 'https://ipv4-c001-den001-t-mobile-isp.1.oca.nflxvideo.net/range/0-46787?o=AQMZ_Puu5NyQPrlZpdsQTg8swrRef0kunb8Q4aBPHrvSrYyr84SzpeLIItm3Zu9GHrCaZJD0Larux50vTzYtD_n_1srxof3ziPQgCdo-v5I2OYUbHgoP2a7FTxUB05WFYoOS5ZOcFVKAWMQimv4L5ejAIgeRgB8S6J9tHTxVw_e_uTT9YKP_itbjh7UMJQm5LAH2JMue9tevujEhb1XAFWPuckT4FmJ0zlEjsokHAmh3VoDs&v=5&e=1593559874&t=03OddDPJOFByxk72BMaX7I5aIjY';
       fetchAB(url, (buf) => {
         // const rawChunk = await response.arrayBuffer();
         // const chunk = new Uint8Array(rawChunk);
@@ -159,6 +186,14 @@ const App = () => {
 
   // };
 
+  const onDecryptMslClick = async () => {
+    const encrypted = document.getElementById('mslResponse').nodeValue;
+    console.log(encrypted);
+    const decrypted = await decryptMslResponse(encrypted);
+    console.log(decrypted);
+    document.getElementById('mslDecrypted').value = decrypted;
+  }
+
   return (
     <div className="App">
       <header className="App-header">
@@ -169,6 +204,9 @@ const App = () => {
         </p>
         <button onClick={obtainSessionMediaKeys}>Initialize Media Key System</button>
         <button onClick={playSomethingFromNetflix}>Request Manifest for Show</button>
+        <input id="mslResponse" type="text"></input>
+        <button onClick={onDecryptMslClick}>Decrypt Msl Response</button>
+        <textarea id="mslDecrypted"></textarea>
         {/* <button onClick={playIt}>Play</button> */}
       </header>
     </div>
