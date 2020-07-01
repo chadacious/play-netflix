@@ -2,6 +2,8 @@ const SHAKTI_VERSION = 'va572f159';
 const UI_VERSION = `shakti-${SHAKTI_VERSION}`;
 const CLIENT_VERSION = '6.0015.328.011';
 
+const REACT_APP_ENJOY_EXTENSION_ID = 'bebnhildgpjjkldddapclelgaapgfjmj';
+
 let encryptionKeyData;
 let signKeyData;
 let sequenceNumber;
@@ -70,12 +72,38 @@ const profiles = [
     "playready-h264mpl30-dash",
     "playready-h264mpl31-dash",
     "playready-h264mpl40-dash",
+    'playready-h264hpl30-dash',
+    'playready-h264hpl31-dash',
+    'playready-h264hpl40-dash',
     "heaac-2-dash",
+    'heaac-2hq-dash',
     "simplesdh",
     "nflx-cmisc",
     "BIF240",
-    "BIF320"
+    "BIF320",
+    'vp9-profile0-L21-dash-cenc',
+    'vp9-profile0-L30-dash-cenc'
 ];
+
+
+// const m = {
+//     drmType: 'widevine',
+//     isBranching: False, 
+//     flavor: 'PRE_FETCH',
+//     supportsWatermark: True,
+//     uiVersion: 'shakti-va572f159', 
+//     clientVersion: '6.0024.204.011',
+//     videoOutputInfo: [{
+//         type: 'DigitalVideoOutputDescriptor', 
+//         outputType: 'unknown',
+//         isHdcpEngaged: 0,
+//         supportedHdcpVersions: []
+//     }],
+//     viewableId: [80178788], 
+//     uiPlatform: u'SHAKTI', u'type': u'standard', u'isNonMember': False, u'showAllSubDubTracks': False, u'usePsshBox': True, u'desiredVmaf': u'plus_lts', u'isUIAutoPlay': False, u'preferAssistiveAudio': False, 
+// profiles: [u'heaac-2-dash', u'heaac-2hq-dash', u'BIF240', u'BIF320', u'playready-h264mpl30-dash', u'playready-h264mpl31-dash', u'playready-h264mpl40-dash',
+// u'playready-h264hpl30-dash', u'playready-h264hpl31-dash', u'playready-h264hpl40-dash', u'webvtt-lssdh-ios8', u'vp9-profile0-L21-dash-cenc', u'vp9-profile0-L30-dash-cenc', u'vp9-profile0-L31-dash-cenc', u'vp9-profile0-L40-dash-cenc', u'vp9-profile2-L30-dash-cenc-prk', u'vp9-profile2-L31-dash-cenc-prk', u'vp9-profile2-L40-dash-cenc-prk', u'vp9-profile2-L50-dash-cenc-prk', u'vp9-profile2-L51-dash-cenc-prk', u'ddplus-2.0-dash', u'ddplus-5.1-dash', u'ddplus-5.1hq-dash', u'ddplus-atmos-dash'], u'imageSubtitleHeight': 1080, u'supportsPreReleasePin': True, u'drmVersion': 25, u'supportsUnequalizedDownloadables': True, u'titleSpecificData': {u'80178788': {u'unletterboxed': True}}, u'useHttpsStreams': True}
+
 
 // if(use6Channels)
 //     profiles.push("heaac-5.1-dash");
@@ -91,18 +119,84 @@ const header = {
     "messageid": messageid,
 };
 
+const netflixFetch = async ({ url, request, mode }) => {
+    let resJson;
+    try {
+        resJson = await new Promise((resolve) => {
+            const onMessageReceived = (res) => {
+                // console.log(res.data);
+                window.removeEventListener("message", onMessageReceived, false);
+                resolve(res.data);
+            };
+            window.addEventListener("message", onMessageReceived, false);
+            console.log('The netflix request is', {
+                url,
+                mode,
+                ...request,
+            });
+            window.chrome.runtime.sendMessage(
+                REACT_APP_ENJOY_EXTENSION_ID,
+                {
+                    MSLRequest: {
+                        url,
+                        mode,
+                        ...request,
+                    }
+                },
+                (res) => {
+                    console.log('got the body response', res);
+                    resolve(res);
+                }
+            );
+        });
+    } catch (error) {
+        console.log('Attempt to notify Enjoy Chrome extension failed. Perhaps extension is not running'
+            + ' or an unsupported browser is being used.', error);
+    }
+    return resJson;
+};
+
 const getViewableId = async (viewableIdPath) => {
     console.log("Getting video metadata for ID " + viewableIdPath);
 
-    const apiResp = await fetch(
-        shaktiMetadataUrl + viewableIdPath,
-        {
-            credentials: "same-origin",
-            method: "GET"
-        }
-    );
+    // const apiResp = await fetch(
+    //     shaktiMetadataUrl + viewableIdPath,
+    //     {
+    //         credentials: "same-origin",
+    //         method: "GET"
+    //     }
+    // );
+    const apiJson = await netflixFetch({ url: shaktiMetadataUrl + viewableIdPath, request: { credentials: "same-origin", method: "GET" } });
+    // try {
+    //     apiJson = await new Promise((resolve) => {
+    //         const onMessageReceived = (res) => {
+    //             console.log(res.data);
+    //             window.removeEventListener("message", onMessageReceived, false);
+    //             resolve(res.data);
+    //         };
+    //         window.addEventListener("message", onMessageReceived, false);
+    //         window.chrome.runtime.sendMessage(
+    //             REACT_APP_ENJOY_EXTENSION_ID,
+    //             {
+    //                 MSLRequest: {
+    //                     url: shaktiMetadataUrl + viewableIdPath,
+    //                     credentials: "same-origin",
+    //                     method: "GET"
+    //                 }
+    //             },
+    //             (res) => {
+    //                 console.log('got the body response', res);
+    //                 resolve(res);
+    //             }
+    //         );
+    //     });
+    // } catch (error) {
+    //     console.log('Attempt to notify Enjoy Chrome extension failed. Perhaps extension is not running'
+    //         + ' or an unsupported browser is being used.', error);
+    // }
 
-    const apiJson = await apiResp.json();
+
+    // const apiJson = await apiResp.json();
     console.log("Metadata response:");
     console.log(apiJson);
 
@@ -143,6 +237,14 @@ const performKeyExchange = async () => {
         }
     ];
 
+    header.capabilities = {
+        languages: ['en-US'],
+        compressionalgos: []
+    };
+
+    header.renewable = true;
+    header.messageid = messageid;
+
     const headerenvelope = {
         "entityauthdata": {
             "scheme": "NONE",
@@ -154,6 +256,7 @@ const performKeyExchange = async () => {
     };
 
     headerenvelope.headerdata = btoa(JSON.stringify(header));
+    headerenvelope.signature = "";
 
     const payload = {
         "signature": ""
@@ -166,26 +269,56 @@ const performKeyExchange = async () => {
         "data": ""
     }));
 
-    console.log('the key exchange header envelop', headerenvelope);
-    console.log('the key exchange header data', header);
-    console.log('the key exchange payload', JSON.stringify({
-        "sequencenumber": 1,
-        "messageid": messageid,
-        "endofmsg": true,
-        "data": ""
-    }));
+    // console.log('the key exchange header envelop', headerenvelope);
+    // console.log('the key exchange header data', header);
+    // console.log('the key exchange payload', JSON.stringify({
+    //     "sequencenumber": 1,
+    //     "messageid": messageid,
+    //     "endofmsg": true,
+    //     "data": ""
+    // }));
 
     const request = JSON.stringify(headerenvelope) + JSON.stringify(payload);
     console.log('the key exchange request', request);
-    const handshakeResp = await fetch(
-        manifestUrl,
-        {
-            body: request,
-            method: "POST"
-        }
-    );
+    const handshakeJson = await netflixFetch({ url: manifestUrl, request: { body: request, method: "POST" } });
+    // let handshakeJson;
+    // try {
+    //     handshakeJson = await new Promise((resolve) => {
+    //         const onMessageReceived = (res) => {
+    //             console.log(res.data);
+    //             window.removeEventListener("message", onMessageReceived, false);
+    //             resolve(res.data);
+    //         };
+    //         window.addEventListener("message", onMessageReceived, false);
+    //         window.chrome.runtime.sendMessage(
+    //             REACT_APP_ENJOY_EXTENSION_ID,
+    //             {
+    //                 MSLRequest: {
+    //                     url: manifestUrl,
+    //                     body: request,
+    //                     method: "POST"
+    //                 }
+    //             },
+    //             (res) => {
+    //                 console.log('got the body response', res);
+    //                 resolve(res);
+    //             }
+    //         );
+    //     });
+    // } catch (error) {
+    //     console.log('Attempt to notify Enjoy Chrome extension failed. Perhaps extension is not running'
+    //         + ' or an unsupported browser is being used.', error);
+    // }
 
-    const handshakeJson = await handshakeResp.json();
+    // const handshakeResp = await fetch(
+    //     manifestUrl,
+    //     {
+    //         body: request,
+    //         method: "POST"
+    //     }
+    // );
+
+    // const handshakeJson = await handshakeResp.json();
     if (!handshakeJson.headerdata) {
         console.error(JSON.parse(atob(handshakeJson.errordata)));
         throw new Error("Error parsing key exchange response");
@@ -364,7 +497,7 @@ export const getManifest = async (showUrl, esn = defaultEsn) => {
         "clientVersion": CLIENT_VERSION,
         "params": {
             "type": "standard",
-            "viewableId": viewableId,
+            "viewableId": [viewableId],
             "profiles": profiles,
             "flavor": "STANDARD",
             "drmType": "widevine",
@@ -373,11 +506,18 @@ export const getManifest = async (showUrl, esn = defaultEsn) => {
             "isBranching": false,
             "useHttpsStreams": true,
             "imageSubtitleHeight": 720,
+            'uiPlatform': 'SHAKTI',
             "uiVersion": UI_VERSION,
             "clientVersion": CLIENT_VERSION,
             "supportsPreReleasePin": true,
             "supportsWatermark": true,
             "showAllSubDubTracks": false,
+            'supportsUnequalizedDownloadables': true,
+            'titleSpecificData': {
+                [viewableId]: {
+                    'unletterboxed': true
+                }
+            },
             "videoOutputInfo": [
                 {
                     "type": "DigitalVideoOutputDescriptor",
@@ -391,6 +531,8 @@ export const getManifest = async (showUrl, esn = defaultEsn) => {
         }
     };
 
+    console.log('the manifest request data', manifestRequestData);
+
     header.userauthdata = {
         "scheme": "NETFLIXID",
         "authdata": {}
@@ -398,26 +540,33 @@ export const getManifest = async (showUrl, esn = defaultEsn) => {
 
     const encryptedManifestRequest = await generateMslRequestData(manifestRequestData);
 
-    console.log(`let manifestResp = await fetch(
-        ${manifestUrl},
-        {
-            body: ${encryptedManifestRequest},
-            credentials: "same-origin",
-            method: "POST",
-            headers: {"Content-Type": "application/json"}
-        }
-    );`);
-    let manifestResp = await fetch(
-        manifestUrl,
-        {
-            body: encryptedManifestRequest,
-            credentials: "same-origin",
-            method: "POST",
-            headers: {"Content-Type": "application/json"}
-        }
-    );
-
-    manifestResp = await manifestResp.text();
+    // console.log(`let manifestResp = await fetch(
+    //     ${manifestUrl},
+    //     {
+    //         body: ${encryptedManifestRequest},
+    //         credentials: "same-origin",
+    //         method: "POST",
+    //         headers: {"Content-Type": "application/json"}
+    //     }
+    // );`);
+    const manifestResp = await netflixFetch({
+        url: manifestUrl,
+        mode: 'text',
+        request: { body: encryptedManifestRequest, credentials: "same-origin", method: "POST", headers: {"Content-Type": "application/json"} }
+    });
+    
+    // let manifestResp = await fetch(
+    //     manifestUrl,
+    //     {
+    //         body: encryptedManifestRequest,
+    //         credentials: "same-origin",
+    //         method: "POST",
+    //         headers: {"Content-Type": "application/json"}
+    //     }
+    // );
+    // const manifestResp = manifestJson;
+    // console.log(manifestResp);
+    // manifestResp = await manifestResp.text();
     const manifest = await decryptMslResponse(manifestResp);
 
     console.log("Manifest:");
@@ -438,29 +587,41 @@ export const getLicense = async (challenge, sessionId) => {
         "uiVersion": UI_VERSION,
         "clientVersion": CLIENT_VERSION,
         "params": [{
-            "sessionId": sessionId,
+            "drmSessionId": sessionId,
+            // "sessionId": sessionId,
             "clientTime": Math.floor(Date.now() / 1000),
             "challengeBase64": challenge,
             "xid": Math.floor((Math.floor(Date.now() / 1000) + 0.1612) * 1000)
         }],
-        "echo": "sessionId"
+        "echo": "drmSessionId"
     };
+    console.log('licenseRequestData', licenseRequestData);
+
+    // [{u'clientTime': 1593568572, u'drmSessionId': u'87B6918474B915387CE4C574231FE660', u'xid': '15935685728210', u'challengeBase64': u'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'}]
 
     const encryptedLicenseRequest = await generateMslRequestData(licenseRequestData);
-    let licenseResp = await fetch(
-        licenseUrl,
-        {
-            body: encryptedLicenseRequest,
-            credentials: "same-origin",
-            method: "POST",
-            headers: {"Content-Type": "application/json"}
-        }
-    );
 
-    licenseResp = await licenseResp.text();
+    const licenseResp = await netflixFetch({
+        url: licenseUrl + '?reqAttempt=1&reqPriority=0&reqName=prefetch/license',
+        mode: 'text',
+        request: { body: encryptedLicenseRequest, credentials: "same-origin", method: "POST", headers: {"Content-Type": "application/json"} }
+    });
+    
+    // let licenseResp = await fetch(
+    //     licenseUrl,
+    //     {
+    //         body: encryptedLicenseRequest,
+    //         credentials: "same-origin",
+    //         method: "POST",
+    //         headers: {"Content-Type": "application/json"}
+    //     }
+    // );
+
+    // licenseResp = await licenseResp.text();
     const license = await decryptMslResponse(licenseResp);
+    
+    // console.log("License:", license);
+    // console.log("License Buffer:", licenseResp);
 
-    console.log("License:", license);
-
-    return license;
+    return license[0].licenseResponseBase64;
 }
