@@ -112,16 +112,16 @@ const App = () => {
     // video.current.play();
   }
 
-  const fetchAB = (url, cb) => {
-    console.log(url);
-    var xhr = new XMLHttpRequest();
-    xhr.open('get', url);
-    xhr.responseType = 'arraybuffer';
-    xhr.onload = function () {
-      cb(xhr.response);
-    };
-    xhr.send();
-  }
+  // const fetchAB = (url, cb) => {
+  //   console.log(url);
+  //   var xhr = new XMLHttpRequest();
+  //   xhr.open('get', url);
+  //   xhr.responseType = 'arraybuffer';
+  //   xhr.onload = function () {
+  //     cb(xhr.response);
+  //   };
+  //   xhr.send();
+  // }
 
   const playSomethingFromNetflix = async () => {
     const manifest = await getManifest('https://www.netflix.com/watch/80244088', 'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0');
@@ -133,6 +133,10 @@ const App = () => {
       console.log('readyState', mediaSource.readyState);
       // console.log('readyState', this.readyState);
       sourceBuffer = mediaSource.addSourceBuffer('video/mp4;codecs=vp09.00.11.08.02')
+      sourceBuffer.addEventListener('error', (err) => console.log('sourceBuffer err', err)); 
+      sourceBuffer.addEventListener('update', (res) => console.log('sourceBuffer update', res)); 
+      sourceBuffer.addEventListener('abort', (res) => console.log('sourceBuffer abort', res)); 
+      sourceBuffer.addEventListener('updatestart', (res) => console.log('sourceBuffer updatestart', res)); 
       console.log('Source buffer created', sourceBuffer);
 
 
@@ -164,54 +168,6 @@ const App = () => {
       ['0-50738'].map(loadChunk);
     }, false);
   }
-
-
-  // const getShowManifest = () => {
-  //   const localeId = "en-US";
-
-  //   const manifestRequestData = {
-  //     "version": 2,
-  //     "url": "/manifest",
-  //     "id": Date.now(),
-  //     "esn": defaultEsn,
-  //     "languages": [localeId],
-  //     "uiVersion": "shakti-v4bf615c3",
-  //     "clientVersion": "6.0015.328.011",
-  //     "params": {
-  //       "type": "standard",
-  //       "viewableId": viewableId,
-  //       "profiles": profiles,
-  //       "flavor": "STANDARD",
-  //       "drmType": "widevine",
-  //       "drmVersion": 25,
-  //       "usePsshBox": true,
-  //       "isBranching": false,
-  //       "useHttpsStreams": true,
-  //       "imageSubtitleHeight": 720,
-  //       "uiVersion": "shakti-v4bf615c3",
-  //       "clientVersion": "6.0015.328.011",
-  //       "supportsPreReleasePin": true,
-  //       "supportsWatermark": true,
-  //       "showAllSubDubTracks": false,
-  //       "videoOutputInfo": [
-  //         {
-  //           "type": "DigitalVideoOutputDescriptor",
-  //           "outputType": "unknown",
-  //           "supportedHdcpVersions": ['1.4'],
-  //           "isHdcpEngaged": true
-  //         }
-  //       ],
-  //       "preferAssistiveAudio": false,
-  //       "isNonMember": false
-  //     }
-  //   };
-    
-  //   header.userauthdata = {
-  //     "scheme": "NETFLIXID",
-  //     "authdata": {}
-  //   };
-
-  // };
 
   const onDecryptMslClick = async () => {
     const encrypted = document.getElementById('mslResponse').nodeValue;
