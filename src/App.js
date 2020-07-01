@@ -1,10 +1,22 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { getManifest, getLicense, decryptMslResponse } from './mslClient';
+import shaka from 'shaka-player';
 // import logo from './logo.svg';
 import './App.css';
 
+const onErrorEvent = (event) => {
+  // Extract the shaka.util.Error object from the event.
+  onError(event.detail);
+}
+
+const onError = (error) => {
+  // Log the error.
+  console.error('Error code', error.code, 'object', error);
+}
+
 const App = () => {
   const video = useRef();
+  const player = useRef();
   const config = useRef();
   const keySession = useRef();
   const mediaKeys = useRef();
@@ -13,8 +25,29 @@ const App = () => {
   const SERVER_CERT = 'Cr0CCAMSEOVEukALwQ8307Y2+LVP+0MYh/HPkwUijgIwggEKAoIBAQDm875btoWUbGqQD8eAGuBlGY+Pxo8YF1LQR+Ex0pDONMet8EHslcZRBKNQ/09RZFTP0vrYimyYiBmk9GG+S0wB3CRITgweNE15cD33MQYyS3zpBd4z+sCJam2+jj1ZA4uijE2dxGC+gRBRnw9WoPyw7D8RuhGSJ95OEtzg3Ho+mEsxuE5xg9LM4+Zuro/9msz2bFgJUjQUVHo5j+k4qLWu4ObugFmc9DLIAohL58UR5k0XnvizulOHbMMxdzna9lwTw/4SALadEV/CZXBmswUtBgATDKNqjXwokohncpdsWSauH6vfS6FXwizQoZJ9TdjSGC60rUB2t+aYDm74cIuxAgMBAAE6EHRlc3QubmV0ZmxpeC5jb20SgAOE0y8yWw2Win6M2/bw7+aqVuQPwzS/YG5ySYvwCGQd0Dltr3hpik98WijUODUr6PxMn1ZYXOLo3eED6xYGM7Riza8XskRdCfF8xjj7L7/THPbixyn4mULsttSmWFhexzXnSeKqQHuoKmerqu0nu39iW3pcxDV/K7E6aaSr5ID0SCi7KRcL9BCUCz1g9c43sNj46BhMCWJSm0mx1XFDcoKZWhpj5FAgU4Q4e6f+S8eX39nf6D6SJRb4ap7Znzn7preIvmS93xWjm75I6UBVQGo6pn4qWNCgLYlGGCQCUm5tg566j+/g5jvYZkTJvbiZFwtjMW5njbSRwB3W4CrKoyxw4qsJNSaZRTKAvSjTKdqVDXV/U5HK7SaBA6iJ981/aforXbd2vZlRXO/2S+Maa2mHULzsD+S5l4/YGpSt7PnkCe25F+nAovtl/ogZgjMeEdFyd/9YMYjOS4krYmwp3yJ7m9ZzYCQ6I8RQN4x/yLlHG5RH/+WNLNUs6JAZ0fFdCmw=';
   // const LICENSE_SERVER_URL = 'https://www.netflix.com/nq/msl_v1/cadmium/pbo_licenses/%5E1.0.0/router?reqAttempt=1&reqPriority=0&reqName=prefetch/license'
 
+  useEffect(() => { video.current = document.querySelector('video'); }, []);
+  // useEffect(() => {
+  //   // Install built-in polyfills to patch browser incompatibilities.
+  //   shaka.polyfill.installAll();
+
+  //   // Check to see if the browser supports the basic APIs Shaka needs.
+  //   if (shaka.Player.isBrowserSupported()) {
+  //     // Everything looks good!
+  //     video.current = document.querySelector('video');
+  //     player.current = new shaka.Player(video.current);
+
+  //     // Attach player to the window to make it easy to access in the JS console.
+  //     window.player = player.current;
+
+  //     // Listen for error events.
+  //     player.addEventListener('error', onErrorEvent);
+  //   } else {
+  //     // This browser does not have the minimum set of APIs we need.
+  //     console.error('Browser not supported!');
+  //   }
+  // }, []);
+
   const obtainSessionMediaKeys = async () => {
-    video.current = document.querySelector('video');
     config.current = getKeySystemConfig();
     mediaKeys.current = await initMediaKeySystem();
     await createMediaKeySession();
@@ -26,11 +59,11 @@ const App = () => {
         distinctiveIdentifier: 'not-allowed',
         videoCapabilities: [
           {
-            contentType: 'video/mp4;codecs=vp09.00.11.08.02',
+            contentType: 'video/mp4; codecs="avc1.640028"',
             robustness: 'HW_SECURE_DECODE'
           },
           {
-            contentType: 'video/mp4;codecs=vp09.00.11.08.02',
+            contentType: 'video/mp4; codecs="avc1.640028"',
             robustness: 'SW_SECURE_DECODE'
           }
         ],
@@ -69,9 +102,10 @@ const App = () => {
     try {
       const keySystem = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', config.current);
       const mediaKeys = await keySystem.createMediaKeys();
+      video.current.setMediaKeys(mediaKeys);
        // Netflix only
       mediaKeys.setServerCertificate(Uint8Array.from(atob(SERVER_CERT), c => c.charCodeAt(0))).then(ok => console.log('valid server certificate', ok));
-      video.current.setMediaKeys(mediaKeys);
+      // video.current.setMediaKeys(mediaKeys);
       return mediaKeys;
     } catch (error) {
       console.log(error);
@@ -106,9 +140,13 @@ const App = () => {
     const licenseAB = Uint8Array.from(atob(license), c => c.charCodeAt(0));
     // const licenseAB = new Uint8Array(atob(license));
     // console.log('The license for keysession', atob(license), licenseAB);
-    keySession.update(licenseAB).catch(
+    await keySession.update(licenseAB).catch(
       console.error.bind(console, 'update() failed')
     );
+    // await video.current.setMediaKeys(mediaKeys.current);
+    // console.log(keySession);
+    console.log('video.current.mediaKeys', video.current.mediaKeys)
+
     // video.current.play();
   }
 
@@ -124,58 +162,68 @@ const App = () => {
   // }
 
   const playSomethingFromNetflix = async () => {
-    const manifest = await getManifest('https://www.netflix.com/watch/80244088', 'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0');
+    const showUrl = document.getElementById('netflixShowUrl').value;
+    console.log('showUrl', showUrl);
+    const manifest = await getManifest(showUrl || 'https://www.netflix.com/watch/80178790', 'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0');
+
+
+    // Try to load a manifest.
+    // This is an asynchronous process.
+    // player.load(manifestUri).then(function() {
+    //   // This runs if the asynchronous load is successful.
+    //   console.log('The video has now been loaded!');
+    // }).catch(onError);  // onError is executed if the asynchronous load fails.
+
+
     const mediaSource = new MediaSource();
     video.current.src = window.URL.createObjectURL(mediaSource);
 
-    let sourceBuffer;
+    let vidSourceBuffer;
+    let audSourceBuffer;
     mediaSource.addEventListener('sourceopen', () => {
       console.log('readyState', mediaSource.readyState);
       // console.log('readyState', this.readyState);
-      sourceBuffer = mediaSource.addSourceBuffer('video/mp4;codecs=vp09.00.11.08.02')
-      sourceBuffer.addEventListener('error', (err) => console.log('sourceBuffer err', err)); 
-      sourceBuffer.addEventListener('update', (res) => console.log('sourceBuffer update', res)); 
-      sourceBuffer.addEventListener('abort', (res) => console.log('sourceBuffer abort', res)); 
-      sourceBuffer.addEventListener('updatestart', (res) => console.log('sourceBuffer updatestart', res)); 
-      console.log('Source buffer created', sourceBuffer);
+      vidSourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.640028"');
+      audSourceBuffer = mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.5"');
+      vidSourceBuffer.addEventListener('error', (err) => console.log('vidSourceBuffer err', err)); 
+      vidSourceBuffer.addEventListener('update', (res) => console.log('vidSourceBuffer update', res)); 
+      vidSourceBuffer.addEventListener('abort', (res) => console.log('vidSourceBuffer abort', res)); 
+      vidSourceBuffer.addEventListener('updatestart', (res) => console.log('vidSourceBuffer updatestart', res));
+      console.log('Video Source buffer created', vidSourceBuffer);
 
 
       // const url = 'https://ipv4-c001-den001-t-mobile-isp.1.oca.nflxvideo.net/range/0-46787?o=AQMZ_Puu5NyQPrlZpdsQTg8swrRef0kunb8Q4aBPHrvSrYyr84SzpeLIItm3Zu9GHrCaZJD0Larux50vTzYtD_n_1srxof3ziPQgCdo-v5I2OYUbHgoP2a7FTxUB05WFYoOS5ZOcFVKAWMQimv4L5ejAIgeRgB8S6J9tHTxVw_e_uTT9YKP_itbjh7UMJQm5LAH2JMue9tevujEhb1XAFWPuckT4FmJ0zlEjsokHAmh3VoDs&v=5&e=1593559874&t=03OddDPJOFByxk72BMaX7I5aIjY';
-      const baseUrl = manifest.video_tracks[0].streams[0].urls[0].url;
-      console.log('selected url', baseUrl);
+      const vidBaseUrl = manifest.video_tracks[0].streams[0].urls[0].url;
+      console.log('vid selected url', vidBaseUrl);
+      const audBaseUrl = manifest.audio_tracks[0].streams[0].urls[0].url;
+      console.log('aud selected url', audBaseUrl);
 
       const loadChunk = async (range) => {
-        const url = baseUrl.split('?')[0] + 'range/' + range + '?' + baseUrl.split('?')[1];
-        // fetchAB(url, (buf) => {
-        //   // const rawChunk = await response.arrayBuffer();
-        //   // const chunk = new Uint8Array(rawChunk);
-        //   sourceBuffer.addEventListener('updateend', () => {
-        //     console.log('readyState', mediaSource.readyState);
-        //     // mediaSource.endOfStream();
-            
-        //     //console.log(mediaSource.readyState); // ended
-        //   });
-        //   sourceBuffer.appendBuffer(new Uint8Array(buf));
-        //   console.log('appended to source buffer', sourceBuffer.buffered);
-        // });
-        const response = await fetch(url);
-        const rawChunk = await response.arrayBuffer();
-        const chunk = new Uint8Array(rawChunk);
-        console.log(chunk);
-        sourceBuffer.appendBuffer(chunk);
+        const url = vidBaseUrl.split('?')[0] + 'range/' + range + '?' + vidBaseUrl.split('?')[1];
+        const vidResponse = await fetch(vidBaseUrl);
+        const vidRawChunk = await vidResponse.arrayBuffer();
+        // const chunk = new Uint8Array(rawChunk);
+        // console.log(chunk);
+        // console.log(vidRawChunk);
+        vidSourceBuffer.appendBuffer(vidRawChunk);
+
+        const audResponse = await fetch(audBaseUrl);
+        const audRawChunk = await audResponse.arrayBuffer();
+        audSourceBuffer.appendBuffer(audRawChunk);
+
       };
 
       ['0-50738'].map(loadChunk);
     }, false);
   }
 
-  const onDecryptMslClick = async () => {
-    const encrypted = document.getElementById('mslResponse').nodeValue;
-    console.log(encrypted);
-    const decrypted = await decryptMslResponse(encrypted);
-    console.log(decrypted);
-    document.getElementById('mslDecrypted').value = decrypted;
-  }
+  // const onDecryptMslClick = async () => {
+  //   const encrypted = document.getElementById('mslResponse').nodeValue;
+  //   console.log(encrypted);
+  //   const decrypted = await decryptMslResponse(encrypted);
+  //   console.log(decrypted);
+  //   document.getElementById('mslDecrypted').value = decrypted;
+  // }
 
   return (
     <div className="App">
@@ -187,9 +235,8 @@ const App = () => {
         </p>
         <button onClick={obtainSessionMediaKeys}>Initialize Media Key System</button>
         <button onClick={playSomethingFromNetflix}>Request Manifest for Show</button>
-        <input id="mslResponse" type="text"></input>
-        <button onClick={onDecryptMslClick}>Decrypt Msl Response</button>
-        <textarea id="mslDecrypted"></textarea>
+        <input id="netflixShowUrl" type="text"></input>
+        {/* <button onClick={onDecryptMslClick}>Decrypt Msl Response</button> */}
         {/* <button onClick={playIt}>Play</button> */}
       </header>
     </div>
