@@ -487,9 +487,9 @@ export const decryptMslResponse = async (data) => {
 
     const decrypted = JSON.parse(chunks);
 
-    if (!decrypted.result) {
+    if (!decrypted.result || (decrypted.result.length > 0 && decrypted.result[0].error)) {
         console.error(decrypted);
-        throw new Error("Error parsing decrypted data");
+        throw new Error("Error parsing decrypted data", decrypted.result[0].error.detail);
     }
 
     return decrypted.result;

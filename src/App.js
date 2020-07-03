@@ -47,6 +47,74 @@ const App = () => {
   //   }
   // }, []);
 
+
+  // EME Check
+  const keySystems = {
+    widevine: ['com.widevine.alpha'],
+    playready: ['com.microsoft.playready', 'com.youtube.playready'],
+    clearkey: ['webkit-org.w3.clearkey', 'org.w3.clearkey'],
+    primetime: ['com.adobe.primetime', 'com.adobe.access'],
+    fairplay: ['com.apple.fairplay']
+  };
+
+  const supportsEncryptedMediaExtension = function (config) {
+    const supportedSystems = [];
+    const unsupportedSystems = [];
+    const isKeySystemSupported = function (keySystem) {
+      // var config = getKeySystemConfig(); // [{initDataTypes: ['cenc']}];
+      // const config = {
+      //   initDataTypes: ["cenc"],
+      //   audioCapabilities: [{
+      //      contentType: 'audio/mp4;codecs="mp4a.40.2"'
+      //   }],
+      //   videoCapabilities: [{
+      //      contentType: 'video/mp4;codecs="avc1.42E01E"'
+      //   }]
+      // };
+      if (window.navigator.requestMediaKeySystemAccess) {
+        window.navigator.requestMediaKeySystemAccess(keySystem, config).then(function (keySystemAccess) {
+          supportedSystems.push(keySystem);
+        }).catch(function () {
+          unsupportedSystems.push(keySystem);
+        });
+      }
+    };
+    let keysys, dummy, i;
+    for (keysys in keySystems) {
+      if (keySystems.hasOwnProperty(keysys)) {
+        for (dummy in keySystems[keysys]) {
+          isKeySystemSupported(keySystems[keysys][dummy]);
+        }
+      }
+    }
+    console.log(config);
+    console.log('supportedSystems', supportedSystems);
+    console.log('unsupportedSystems', unsupportedSystems);
+  };
+
+  function supportsVideoType(type) {
+    // Allow user to create shortcuts, i.e. just "webm"
+    let formats = {
+      ogg: 'video/ogg; codecs="theora"',
+      h264: 'video/mp4; codecs="avc1.42E01E"',
+      webm: 'video/webm; codecs="vp8, vorbis"',
+      vp9: 'video/webm; codecs="vp9"',
+      hls: 'application/x-mpegURL; codecs="avc1.42E01E"',
+      mp4: 'video/mp4;codecs="avc1.42E01E, mp4a.40.2"'
+    };
+    const supportedCodecs = [];
+    for (let format in formats) {
+      console.log(formats[format]);
+      supportedCodecs.push({ codec: format, support: video.current.canPlayType(formats[format]) });
+      supportsEncryptedMediaExtension([{
+        initDataTypes: ["cenc"],
+        videoCapabilities: [{ contentType: formats[format] }]
+      }]);
+    }
+    console.log(supportedCodecs);
+  }
+
+
   const obtainSessionMediaKeys = async () => {
     config.current = getKeySystemConfig();
     mediaKeys.current = await initMediaKeySystem();
@@ -57,19 +125,19 @@ const App = () => {
   const getKeySystemConfig = () => {
     if (window.Android) {
       return [{
-        distinctiveIdentifier: 'not-allowed',
+        // distinctiveIdentifier: 'not-allowed',
         initDataTypes: ["cenc"],
-        sessionTypes: ["temporary"],
-        // videoCapabilities: [
-        //   {
-        //     contentType: 'video/mp4; codecs="avc1.42E01E"',
-        //     robustness: 'SW_SECURE_CRYPTO'
-        //   },
-        //   // {
-        //   //   contentType: 'video/mp4; codecs="avc1.42E01E"',
-        //   //   robustness: 'SW_SECURE_DECODE'
-        //   // }
-        // ],
+        // sessionTypes: ["temporary"],
+        videoCapabilities: [
+          {
+            contentType: 'video/mp4; codecs="avc1.42E01E"',
+            robustness: 'SW_SECURE_CRYPTO'
+          },
+          {
+            contentType: 'video/mp4; codecs="avc1.42E01E"',
+            robustness: 'SW_SECURE_DECODE'
+          }
+        ],
         audioCapabilities: [{
           contentType: 'audio/mp4; codecs="mp4a.40.2"',
           robustness: 'SW_SECURE_CRYPTO'
@@ -80,11 +148,11 @@ const App = () => {
         distinctiveIdentifier: 'not-allowed',
         videoCapabilities: [
           {
-            contentType: 'video/mp4; codecs="avc1.640028"',
+            contentType: 'video/webm; codecs="vp9"',
             robustness: 'HW_SECURE_DECODE'
           },
           {
-            contentType: 'video/mp4; codecs="avc1.640028"',
+            contentType: 'video/webm; codecs="vp9"',
             robustness: 'SW_SECURE_DECODE'
           }
         ],
@@ -183,8 +251,11 @@ const App = () => {
 
   const playSomethingFromNetflix = async () => {
     const showUrl = document.getElementById('netflixShowUrl').value;
-    console.log('showUrl', showUrl);
-    const manifest = await getManifest(showUrl || 'https://www.netflix.com/watch/80178790', 'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0');
+    // console.log('showUrl', showUrl, window.Android ? 'NFCDCH-01-GGQ0FUED5N7HC239K6L2HXN4W81XL0' : 'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0');
+    const manifest = await getManifest(
+      showUrl || 'https://www.netflix.com/watch/80178790',
+      'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0'
+    );
 
 
     // Try to load a manifest.
@@ -221,6 +292,7 @@ const App = () => {
       const loadChunk = async (range) => {
         const url = vidBaseUrl.split('?')[0] + 'range/' + range + '?' + vidBaseUrl.split('?')[1];
         const vidResponse = await fetch(vidBaseUrl);
+        // const vidResponse = await fetch('https://af8fcb3b2a4a.ngrok.io/download-vid.ntflx');
         const vidRawChunk = await vidResponse.arrayBuffer();
         // const chunk = new Uint8Array(rawChunk);
         // console.log(chunk);
@@ -228,6 +300,7 @@ const App = () => {
         vidSourceBuffer.appendBuffer(vidRawChunk);
 
         const audResponse = await fetch(audBaseUrl);
+        // const audResponse = await fetch('https://af8fcb3b2a4a.ngrok.io/download-aud.ntflx');
         const audRawChunk = await audResponse.arrayBuffer();
         audSourceBuffer.appendBuffer(audRawChunk);
 
@@ -257,7 +330,8 @@ const App = () => {
         <button onClick={playSomethingFromNetflix}>Request Manifest for Show</button>
         <input id="netflixShowUrl" style={{ width: '50vw' }} type="text"></input>
         {/* <button onClick={() => window.Android.sendMSLRequest("Hey there")}>Send Android Message</button> */}
-        {/* <button onClick={playIt}>Play</button> */}
+        <button onClick={supportsEncryptedMediaExtension}>Check Key Systems</button>
+        <button onClick={supportsVideoType}>Check Codecs</button>
       </header>
     </div>
   );
