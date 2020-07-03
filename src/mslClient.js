@@ -133,14 +133,15 @@ const netflixFetch = async ({ url, request, mode }) => {
         resJson = await new Promise((resolve) => {
             const onMSLResponse = (event) => {
                 window.removeEventListener("message", onMSLResponse, false);
-                console.log('event.origin, window.location.origin', event);
+                // console.log('event.origin, window.location.origin', event);
                 if (event.origin === window.location.origin) {
                     console.log(event.data);
                     let res;
                     if (mode === 'text') {
+                        console.log('The mode is text:', event.data);
                         res = event.data;
-                    } else if (mode === 'arraybuffer') { 
-                        res = event.data;
+                    // } else if (mode === 'arraybuffer') { 
+                    //     res = event.data;
                     } else {
                         res = JSON.parse(event.data);
                     }
