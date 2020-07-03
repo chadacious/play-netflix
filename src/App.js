@@ -16,7 +16,7 @@ const onError = (error) => {
 
 const App = () => {
   const video = useRef();
-  const player = useRef();
+  // const player = useRef();
   const config = useRef();
   const keySession = useRef();
   const mediaKeys = useRef();
@@ -55,6 +55,27 @@ const App = () => {
   
   // Netflix only
   const getKeySystemConfig = () => {
+    if (window.Android) {
+      return [{
+        distinctiveIdentifier: 'not-allowed',
+        initDataTypes: ["cenc"],
+        sessionTypes: ["temporary"],
+        // videoCapabilities: [
+        //   {
+        //     contentType: 'video/mp4; codecs="avc1.42E01E"',
+        //     robustness: 'SW_SECURE_CRYPTO'
+        //   },
+        //   // {
+        //   //   contentType: 'video/mp4; codecs="avc1.42E01E"',
+        //   //   robustness: 'SW_SECURE_DECODE'
+        //   // }
+        // ],
+        audioCapabilities: [{
+          contentType: 'audio/mp4; codecs="mp4a.40.2"',
+          robustness: 'SW_SECURE_CRYPTO'
+        }]
+      }];
+    } else {
       return [{
         distinctiveIdentifier: 'not-allowed',
         videoCapabilities: [
@@ -72,7 +93,7 @@ const App = () => {
           robustness: 'SW_SECURE_CRYPTO'
         }]
       }];
-
+    }
       // return [{
       //   distinctiveIdentifier: 'not-allowed',
       //   initDataTypes: ['cenc'],
@@ -102,13 +123,12 @@ const App = () => {
     try {
       const keySystem = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', config.current);
       const mediaKeys = await keySystem.createMediaKeys();
-      video.current.setMediaKeys(mediaKeys);
+      // video.current.setMediaKeys(mediaKeys);
        // Netflix only
       mediaKeys.setServerCertificate(Uint8Array.from(atob(SERVER_CERT), c => c.charCodeAt(0))).then(ok => console.log('valid server certificate', ok));
-      // video.current.setMediaKeys(mediaKeys);
       return mediaKeys;
     } catch (error) {
-      console.log(error);
+      console.log(error.message);
       throw error;
     }
       
@@ -231,12 +251,12 @@ const App = () => {
         {/* <img src={logo} className="App-logo" alt="logo" /> */}
         <video id="my-vid" width="320" height="240" autoPlay controls playsInline />
         <p>
-          Edit <code>src/App.js</code> and save to reload.
+          Watch Netflix in a video tag!
         </p>
         <button onClick={obtainSessionMediaKeys}>Initialize Media Key System</button>
         <button onClick={playSomethingFromNetflix}>Request Manifest for Show</button>
-        <input id="netflixShowUrl" type="text"></input>
-        {/* <button onClick={onDecryptMslClick}>Decrypt Msl Response</button> */}
+        <input id="netflixShowUrl" style={{ width: '50vw' }} type="text"></input>
+        {/* <button onClick={() => window.Android.sendMSLRequest("Hey there")}>Send Android Message</button> */}
         {/* <button onClick={playIt}>Play</button> */}
       </header>
     </div>

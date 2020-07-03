@@ -121,37 +121,67 @@ const header = {
 
 const netflixFetch = async ({ url, request, mode }) => {
     let resJson;
-    try {
+
+    if (window.Android) {
+        console.log('the request object', request);
+        // if (request.body) {
+        //     request.body = request.body.replace(/"/g, "&quot;");
+        // }
+        
+        console.log('the request object', JSON.stringify(request));
+        window.Android.sendMSLRequest(url, mode, JSON.stringify(request));
         resJson = await new Promise((resolve) => {
-            const onMessageReceived = (res) => {
-                // console.log(res.data);
-                window.removeEventListener("message", onMessageReceived, false);
-                resolve(res.data);
-            };
-            window.addEventListener("message", onMessageReceived, false);
-            console.log('The netflix request is', {
-                url,
-                mode,
-                ...request,
-            });
-            window.chrome.runtime.sendMessage(
-                REACT_APP_ENJOY_EXTENSION_ID,
-                {
-                    MSLRequest: {
-                        url,
-                        mode,
-                        ...request,
+            const onMSLResponse = (event) => {
+                window.removeEventListener("message", onMSLResponse, false);
+                console.log('event.origin, window.location.origin', event);
+                if (event.origin === window.location.origin) {
+                    console.log(event.data);
+                    let res;
+                    if (mode === 'text') {
+                        res = event.data;
+                    } else if (mode === 'arraybuffer') { 
+                        res = event.data;
+                    } else {
+                        res = JSON.parse(event.data);
                     }
-                },
-                (res) => {
-                    console.log('got the body response', res);
                     resolve(res);
                 }
-            );
-        });
-    } catch (error) {
-        console.log('Attempt to notify Enjoy Chrome extension failed. Perhaps extension is not running'
-            + ' or an unsupported browser is being used.', error);
+            };
+            window.addEventListener("message", onMSLResponse, false);
+        })
+    } else {
+        try {
+            resJson = await new Promise((resolve) => {
+                const onMessageReceived = (res) => {
+                    // console.log(res.data);
+                    window.removeEventListener("message", onMessageReceived, false);
+                    resolve(res.data);
+                };
+                window.addEventListener("message", onMessageReceived, false);
+                console.log('The netflix request is', {
+                    url,
+                    mode,
+                    ...request,
+                });
+                window.chrome.runtime.sendMessage(
+                    REACT_APP_ENJOY_EXTENSION_ID,
+                    {
+                        MSLRequest: {
+                            url,
+                            mode,
+                            ...request,
+                        }
+                    },
+                    (res) => {
+                        console.log('got the body response', res);
+                        resolve(res);
+                    }
+                );
+            });
+        } catch (error) {
+            console.log('Attempt to notify Enjoy Chrome extension failed. Perhaps extension is not running'
+                + ' or an unsupported browser is being used.', error);
+        }
     }
     return resJson;
 };
