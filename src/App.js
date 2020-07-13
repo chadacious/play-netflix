@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { getManifest, getLicense, decryptMslResponse } from './mslClient';
+import { getManifest, getLicense } from './mslClient';
+import { getManifestAndroid, getLicenseAndroid } from './mslClientAndroid';
 import shaka from 'shaka-player';
 // import logo from './logo.svg';
 import './App.css';
@@ -126,17 +127,17 @@ const App = () => {
     if (window.Android) {
       return [{
         // distinctiveIdentifier: 'not-allowed',
-        initDataTypes: ["cenc"],
-        // sessionTypes: ["temporary"],
+        // initDataTypes: ["cenc"],
+        sessionTypes: ["temporary"],
         videoCapabilities: [
           {
             contentType: 'video/mp4; codecs="avc1.42E01E"',
-            robustness: 'SW_SECURE_CRYPTO'
+            // robustness: 'SW_SECURE_CRYPTO'
           },
-          {
-            contentType: 'video/mp4; codecs="avc1.42E01E"',
-            robustness: 'SW_SECURE_DECODE'
-          }
+          // {
+          //   contentType: 'video/mp4; codecs="avc1.42E01E"',
+          //   robustness: 'SW_SECURE_DECODE'
+          // }
         ],
         audioCapabilities: [{
           contentType: 'audio/mp4; codecs="mp4a.40.2"',
@@ -191,7 +192,7 @@ const App = () => {
     try {
       const keySystem = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', config.current);
       const mediaKeys = await keySystem.createMediaKeys();
-      // video.current.setMediaKeys(mediaKeys);
+      video.current.setMediaKeys(mediaKeys);
        // Netflix only
       mediaKeys.setServerCertificate(Uint8Array.from(atob(SERVER_CERT), c => c.charCodeAt(0))).then(ok => console.log('valid server certificate', ok));
       return mediaKeys;
@@ -220,7 +221,12 @@ const App = () => {
   const handleMessage = async (event) => {
     console.log('here in handleMessage', event);
     const challengeBase64 = btoa(String.fromCharCode(...new Uint8Array(event.message)));
-    const license = await getLicense(challengeBase64, event.target.sessionId);
+    let license;
+    if (window.Android) {
+      license = await getLicenseAndroid(challengeBase64, event.target.sessionId);
+    } else {
+      license = await getLicense(challengeBase64, event.target.sessionId);
+    }
     // const response = await fetch(LICENSE_SERVER_URL, { method: 'POST', body: event.message });
     // const license = await response.arrayBuffer();
     console.log('The returned license is:', license);
@@ -252,11 +258,16 @@ const App = () => {
   const playSomethingFromNetflix = async () => {
     const showUrl = document.getElementById('netflixShowUrl').value;
     // console.log('showUrl', showUrl, window.Android ? 'NFCDCH-01-GGQ0FUED5N7HC239K6L2HXN4W81XL0' : 'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0');
-    const manifest = await getManifest(
-      showUrl || 'https://www.netflix.com/watch/80178790',
-      'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0'
-    );
-
+    let manifest;
+    if (!window.Android) {
+      manifest = await getManifest(
+        showUrl || 'https://www.netflix.com/watch/80178790',
+        'NFCDCH-02-GGQ0FUED5N7HC239K6L2HXN4W81XL0');
+    } else {
+      manifest = await getManifestAndroid(
+        showUrl || 'https://www.netflix.com/watch/80178790',
+        'NFCDCH-01-GGGGJDEGRGXKTTAKCDTJ4TC9MEJHX2');
+    }
 
     // Try to load a manifest.
     // This is an asynchronous process.
@@ -274,8 +285,10 @@ const App = () => {
     mediaSource.addEventListener('sourceopen', () => {
       console.log('readyState', mediaSource.readyState);
       // console.log('readyState', this.readyState);
-      vidSourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.640028"');
-      audSourceBuffer = mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.5"');
+      // vidSourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.640028"');
+      // audSourceBuffer = mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.5"');
+      vidSourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E"');
+      audSourceBuffer = mediaSource.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"');
       vidSourceBuffer.addEventListener('error', (err) => console.log('vidSourceBuffer err', err)); 
       vidSourceBuffer.addEventListener('update', (res) => console.log('vidSourceBuffer update', res)); 
       vidSourceBuffer.addEventListener('abort', (res) => console.log('vidSourceBuffer abort', res)); 
@@ -292,7 +305,7 @@ const App = () => {
       const loadChunk = async (range) => {
         const url = vidBaseUrl.split('?')[0] + 'range/' + range + '?' + vidBaseUrl.split('?')[1];
         const vidResponse = await fetch(vidBaseUrl);
-        // const vidResponse = await fetch('https://af8fcb3b2a4a.ngrok.io/download-vid.ntflx');
+        // const vidResponse = await fetch('https://4319062544fa.ngrok.io/download-vid.ntflx');
         const vidRawChunk = await vidResponse.arrayBuffer();
         // const chunk = new Uint8Array(rawChunk);
         // console.log(chunk);
@@ -300,7 +313,7 @@ const App = () => {
         vidSourceBuffer.appendBuffer(vidRawChunk);
 
         const audResponse = await fetch(audBaseUrl);
-        // const audResponse = await fetch('https://af8fcb3b2a4a.ngrok.io/download-aud.ntflx');
+        // const audResponse = await fetch('https://4319062544fa.ngrok.io/download-aud.ntflx');
         const audRawChunk = await audResponse.arrayBuffer();
         audSourceBuffer.appendBuffer(audRawChunk);
 

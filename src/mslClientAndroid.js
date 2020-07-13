@@ -63,7 +63,7 @@ const generateEsn = () => {
   return text;
 }
 
-let defaultEsn = "NFCDCH-02-" + generateEsn();
+let defaultEsn = "NFCDCH-01-" + generateEsn();
 
 const manifestUrl = "https://www.netflix.com/nq/msl_v1/cadmium/pbo_manifests/^1.0.0/router";
 const licenseUrl = "https://www.netflix.com/nq/msl_v1/cadmium/pbo_licenses/^1.0.0/router";
@@ -497,7 +497,7 @@ export const decryptMslResponse = async (data) => {
 
 // const manifestChallenge = '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';
 
-export const getManifest = async (showUrl, esn = defaultEsn) => {
+export const getManifestAndroid = async (showUrl, esn = defaultEsn) => {
     defaultEsn = esn;
     console.log("Performing key exchange");
     const keyExchangeData = await performKeyExchange();
@@ -620,7 +620,7 @@ export const getManifest = async (showUrl, esn = defaultEsn) => {
     return manifest;
 }
 
-export const getLicense = async (challenge, sessionId) => {
+export const getLicenseAndroid = async (challenge, sessionId) => {
     const licenseRequestData = {
         "version": 2,
         "url": licensePath,
